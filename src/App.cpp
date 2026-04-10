@@ -209,6 +209,12 @@ void App::DrawMenuBar()
             loadPopupActive = true;
             FileSelector::GetInstance().RefreshCurrDir();
         }
+		//load second image for blending and masking
+        if (ImGui::MenuItem("Wczytaj drugi obraz (maska/mieszanie)"))
+        {
+            loadSecondImagePopupActive = true;
+            FileSelector::GetInstance().RefreshCurrDir();
+        }
         // quit
         ImGui::Separator();
         if (ImGui::MenuItem("Wyjdź"))
@@ -247,6 +253,9 @@ void App::DrawMenuBar()
     // popups
     if (loadPopupActive)
         DrawLoadPopup();
+
+    if (loadSecondImagePopupActive)
+        DrawLoadSecondImagePopup();
 
     if (saveAsPopupActive)
         DrawSavePopup();
@@ -335,12 +344,27 @@ void App::DrawMiddleButtonsWindow(float h)
     ImGui::Text("Wybrany algorytm:");
     ImGui::Text("%s", selectedAlgorithmName.c_str());
 
+    if(algorithmSelected == Masking || algorithmSelected == BlendImages)
+    {
+        ImGui::Separator();
+        if (secondImage.NoSurface())
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "Brak drugiego obrazu!");
+        else
+            ImGui::TextColored(ImVec4(0.4f, 1, 0.4f, 1), "Drugi obraz wczytany");
+        ImGui::Separator();
+    }
+
     ImGui::SeparatorText("Rozpocznij");
     if (ImGui::Button("Przetwórz obraz", ImVec2(MIDDLE_BUTTON_W, MIDDLE_BUTTON_H)))
     {
         // not valid for transformation
         if (algorithmSelected == None || inputImage.NoSurface())
             errorPopupAlgActive = true;
+        else if ((algorithmSelected == Masking || algorithmSelected == BlendImages) && secondImage.NoSurface())
+        {
+            errorNoSecondImageActive = true;
+            errorPopupAlgActive = true;
+        }
         else
         {
             // can not be called if thread is execiting
@@ -396,6 +420,11 @@ void App::DrawMiddleButtonsWindow(float h)
             inputImage = outputImage;
             outputImage.ClearImage();
         }
+        ImGui::Text("Ustaw wynik jako\ndrugi obraz (do mieszania)");
+        if (ImGui::Button("Drugi obraz = Wyjście", ImVec2(MIDDLE_BUTTON_W, MIDDLE_BUTTON_H)))
+        {
+            secondImage = outputImage;
+        }
     }
 
     DrawParametersPopup();
@@ -414,6 +443,14 @@ void App::DrawMiddleButtonsWindow(float h)
     {
         ResetParameters();
         resetDonePopupActive = true;
+    }
+    if (!secondImage.NoSurface())
+    {
+        if (ImGui::Button("Wyczyść drugi obraz", ImVec2(MIDDLE_BUTTON_W, MIDDLE_BUTTON_H)))
+        {
+            secondImage.ClearImage();
+            resetDonePopupActive = true;
+        }
     }
 
     if (resetDonePopupActive)
@@ -522,6 +559,11 @@ void App::DrawAlgMenuElements()
         selectedAlgorithmName = "Potęgowanie";
         algorithmSelected = Exponentiation;
     }
+    if (ImGui::MenuItem("Logarytmowanie", NULL, algorithmSelected == Logarithm))
+    {
+        selectedAlgorithmName = "Logarytmowanie";
+        algorithmSelected = Logarithm;
+    }
     if (ImGui::MenuItem("Wyrównanie histogramu", NULL, algorithmSelected == LeveledHistogram))
     {
         selectedAlgorithmName = "Wyrównanie histogramu";
@@ -542,6 +584,18 @@ void App::DrawAlgMenuElements()
         selectedAlgorithmName = "Filtry medianowe";
         algorithmSelected = MedianFilter;
     }
+    ImGui::Separator();
+    if (ImGui::MenuItem("Maskowanie", NULL, algorithmSelected == Masking))
+    {
+        selectedAlgorithmName = "Maskowanie";
+        algorithmSelected = Masking;
+    }
+    if (ImGui::MenuItem("Mieszanie obrazów", NULL, algorithmSelected == BlendImages))
+    {
+        selectedAlgorithmName = "Mieszanie obrazów";
+        algorithmSelected = BlendImages;
+    }
+    ImGui::Separator();
     if (ImGui::MenuItem("Erozja", NULL, algorithmSelected == Erosion))
     {
         selectedAlgorithmName = "Erozja";
@@ -638,6 +692,82 @@ void App::DrawLoadPopup()
             ImGui::SetNextWindowSize(ImVec2(0, 100));
             ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
             if (ImGui::BeginPopupModal("BLĄD", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
+            {
+                ImGui::Text("Nie udało sie wczytać pliku");
+                ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - CANCEL_BUTTON_W / 2);
+                if (ImGui::Button("OK", ImVec2(CANCEL_BUTTON_W, 0)))
+                {
+                    errorPopupActive = false;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void App::DrawLoadSecondImagePopup()
+{
+    ImGui::OpenPopup("WczytajDrugiObraz", ImGuiPopupFlags_NoReopen);
+    ImGui::SetNextWindowSize(ImVec2(FILE_POPUP_WIDTH, FILE_POPUP_HEIGHT));
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("WczytajDrugiObraz", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
+    {
+        ImGui::Text("Wybierz obraz maski / do mieszania");
+        ImGui::Separator();
+
+        auto dir = FileSelector::GetInstance().GetCurrDir();
+        auto map = FileSelector::GetInstance().GetDirMaped();
+        ImGui::BeginChild("Dir2", ImVec2(DIR_LIST_WIDTH, DIR_LIST_HEIGHT), ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::Text("%s", FileSelector::GetInstance().GetCurrDirectoryPath().generic_u8string().c_str());
+        ImGui::Separator();
+        for (auto entry : dir)
+            if (ImGui::Selectable(entry.path().filename().generic_u8string().c_str(), map[entry.path()], ImGuiSelectableFlags_NoAutoClosePopups))
+                if (FileSelector::GetInstance().SelectEntry(entry.path()) == FileSelector::FileEntry)
+                {
+                    if (secondImage.SetSourceImage(FileSelector::GetInstance().GetFullPathToEntry()) == -1)
+                        errorPopupActive = true;
+                    else
+                    {
+                        loadSecondImagePopupActive = false;
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+        ImGui::EndChild();
+        ImGui::Separator();
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - CANCEL_BUTTON_W / 2);
+        if (ImGui::Button("Otwórz", ImVec2(CANCEL_BUTTON_W, 0)))
+        {
+            if (FileSelector::GetInstance().SelectCurrEntry() == FileSelector::FileEntry)
+            {
+                if (secondImage.SetSourceImage(FileSelector::GetInstance().GetFullPathToEntry()) == -1)
+                    errorPopupActive = true;
+                else
+                {
+                    loadSecondImagePopupActive = false;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+        }
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - CANCEL_BUTTON_W / 2);
+        if (ImGui::Button("Folder wyżej", ImVec2(CANCEL_BUTTON_W, 0)))
+            FileSelector::GetInstance().GoUpADirectory();
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - CANCEL_BUTTON_W / 2);
+        if (ImGui::Button("Anuluj", ImVec2(CANCEL_BUTTON_W, 0)))
+        {
+            loadSecondImagePopupActive = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (errorPopupActive)
+        {
+            ImGui::OpenPopup("BLĄD2", ImGuiPopupFlags_NoReopen);
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowSize(ImVec2(0, 100));
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            if (ImGui::BeginPopupModal("BLĄD2", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
             {
                 ImGui::Text("Nie udało sie wczytać pliku");
                 ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - CANCEL_BUTTON_W / 2);
@@ -867,6 +997,8 @@ void App::DrawMiddleErrorPopup()
         // not transformed
         else if (errorCopying)
             ImGui::Text("Błąd podczas kopiowania obrazu");
+        else if (errorNoSecondImageActive)
+            ImGui::Text("Brak drugiego obrazu!\nWczytaj go przez Plik -> Wczytaj drugi obraz");
         else if (outputImage.NoSurface())
             ImGui::Text("Nie można odświerzyć obraz nie przetworzony");
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - CANCEL_BUTTON_W / 2);
@@ -965,10 +1097,14 @@ void App::DrawParametersPopup()
             ImGui::SliderInt("O ile rozjaśnić/przyciemnić?", &params.value, -255, 255);
             break;
         case Contrast:
-            ImGui::SliderFloat("O ile zmienić kontrast?", &params.contrast, 0.1, 5.0);
+            ImGui::SliderFloat("O ile zmienić kontrast?", &params.contrast, 0.1, 7.0);
             break;
         case Exponentiation:
             ImGui::SliderFloat("Wartość alfa", &params.alfa, 0.1, 3.0);
+            break;
+        case Logarithm:
+            ImGui::Text("Brak parametrów - Jw = log(1 + J)");
+            ImGui::Text("Wynik skalowany do [0, 255]");
             break;
         case LeveledHistogram:
             ImGui::Text("Brak parametrów do tego algorytmu");
@@ -981,6 +1117,12 @@ void App::DrawParametersPopup()
             break;
         case MedianFilter:
             DrawMedianFilterParams();
+            break;
+        case Masking:
+            DrawMaskingAndBlendParams();
+            break;
+        case BlendImages:
+            DrawMaskingAndBlendParams();
             break;
         case Erosion:
             DrawErosionParams();
@@ -1185,6 +1327,45 @@ void App::DrawDilatationParams()
     DrawInputArray("Element strukturalny", params.dilatationElementSize, params.dilatationElement3x3, params.dilatationElement5x5, params.dilatationElement7x7);
 }
 
+void App::DrawMaskingAndBlendParams()
+{
+    if (algorithmSelected == Masking)
+    {
+        ImGui::Text("Maskowanie obrazu");
+        ImGui::Separator();
+        ImGui::TextWrapped("Jw(x,y) = J1(x,y) * Jmaska(x,y) / 255");
+        ImGui::Separator();
+        ImGui::Text("Stan drugiego obrazu (maski):");
+        if (secondImage.NoSurface())
+            ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "Nie wczytano! Wczytaj przez:\nPlik -> Wczytaj drugi obraz");
+        else
+        {
+            ImGui::TextColored(ImVec4(0.3f, 1, 0.3f, 1), "Wczytano (%dx%d)",
+                secondImage.GetWidth(), secondImage.GetHeight());
+        }
+    }
+    else // BlendImages
+    {
+        ImGui::Text("Mieszanie obrazów");
+        ImGui::Separator();
+        ImGui::TextWrapped("Jwy = alpha * J1 + (1-alpha) * J2");
+        ImGui::Separator();
+        // suwak alpha
+        ImGui::SliderFloat("alpha", &params.blendAlpha, 0.0f, 1.0f);
+        ImGui::Text("alpha=1: tylko J1 (wejsciowy)");
+        ImGui::Text("alpha=0: tylko J2 (drugi obraz)");
+        ImGui::Separator();
+        ImGui::Text("Stan drugiego obrazu (J2):");
+        if (secondImage.NoSurface())
+            ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "Nie wczytano! Wczytaj przez:\nPlik -> Wczytaj drugi obraz\nlub uzyj 'Drugi obraz = Wyjscie'");
+        else
+        {
+            ImGui::TextColored(ImVec4(0.3f, 1, 0.3f, 1), "Wczytano (%dx%d)",
+                secondImage.GetWidth(), secondImage.GetHeight());
+        }
+    }
+}
+
 void App::DrawHelpMenu()
 {
     // not finished
@@ -1215,6 +1396,9 @@ void App::LaunchAlgorithms()
     case Exponentiation:
         algorithmThread = std::thread(&Algorithms::Exponentiation, &outputImage, &params);
         break;
+    case Logarithm:
+        algorithmThread = std::thread(&Algorithms::Logarithm, &outputImage);
+        break;
     case LeveledHistogram:
         algorithmThread = std::thread(&Algorithms::LevelHistogram, &outputImage);
         break;
@@ -1226,6 +1410,12 @@ void App::LaunchAlgorithms()
         break;
     case MedianFilter:
         algorithmThread = std::thread(&Algorithms::MedianFilter, &outputImage, &params);
+        break;
+    case Masking:
+        algorithmThread = std::thread(&Algorithms::Masking, &outputImage, &secondImage);
+        break;
+    case BlendImages:
+        algorithmThread = std::thread(&Algorithms::BlendImages, &outputImage, &secondImage, &params);
         break;
     case Erosion:
         algorithmThread = std::thread(&Algorithms::Erosion, &outputImage, &params);
@@ -1279,6 +1469,8 @@ void App::ResetParameters()
     params.maxIndexRo = 0;
     params.maxIndexTheta = 0;
     params.maxHoughtVal = 0;
+	// blend
+    params.blendAlpha = 0.5f;
 }
 
 void App::AutoRefreshOutputImage()

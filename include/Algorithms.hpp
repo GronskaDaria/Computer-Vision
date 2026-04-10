@@ -300,6 +300,8 @@ namespace Algorithms
         int maxIndexRo = 0;
         int maxIndexTheta = 0;
         int maxHoughtVal = 0;
+        // Współczynnik alpha do mieszania: Jwy = alpha*J1 + (1-alpha)*J2
+        float blendAlpha = 0.5f;
 
     };
 
@@ -311,6 +313,8 @@ namespace Algorithms
 
     void Exponentiation(Image *outputImage, ParametersStruct *params);
 
+    void Logarithm(Image* outputImage);
+
     void LevelHistogram(Image *outputImage);
 
     void Binarization(Image *outputImage, ParametersStruct *params);
@@ -318,6 +322,10 @@ namespace Algorithms
     void LinearFilter(Image *outputImage, ParametersStruct *params);
 
     void MedianFilter(Image *outputImage, ParametersStruct *params);
+
+    void Masking(Image* outputImage, Image* maskImage);
+
+    void BlendImages(Image* outputImage, Image* secondImage, ParametersStruct* params);
 
     void Erosion(Image *outputImage, ParametersStruct *params);
 

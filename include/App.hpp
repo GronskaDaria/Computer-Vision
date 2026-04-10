@@ -94,8 +94,11 @@ public:
         Brighten,
         Contrast,
         Exponentiation,
+        Logarithm,
         LeveledHistogram,
         Binarization,
+        Masking,
+        BlendImages,
         LinearFilter,
         MedianFilter,
         Erosion,
@@ -139,6 +142,8 @@ private:
     // popups
     // draw and handle logic for load popup
     void DrawLoadPopup();
+	// draw and handle logic for load popup image for second image (for blending and masking)
+    void DrawLoadSecondImagePopup();
     // draw and handle logic for save AS popup
     void DrawSavePopup();
     // draw and handle logic save warning and error popups
@@ -163,6 +168,7 @@ private:
     void DrawMedianFilterParams();
     void DrawErosionParams();
     void DrawDilatationParams();
+    void DrawMaskingAndBlendParams();
 
     // other
     void DrawHelpMenu();
@@ -187,6 +193,7 @@ private:
     bool show_demo_window = false;
     bool runLoop = true;
     bool loadPopupActive = false;
+    bool loadSecondImagePopupActive = false;
     bool saveAsPopupActive = false;
     bool errorPopupActive = false;
     bool errorPopupAlgActive = false;
@@ -199,6 +206,7 @@ private:
     bool settingsPopupActive = false;
     bool helpWindowActive = false;
     bool resetDonePopupActive = false;
+    bool errorNoSecondImageActive = false;
 
     // image histograms and plot flags
     int modeI = Brightnes;
@@ -228,6 +236,7 @@ private:
     // Images
     Image inputImage;
     Image outputImage; // shared
+    Image secondImage;
 
     // Scale
     float mainScale;
