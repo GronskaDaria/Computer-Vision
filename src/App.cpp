@@ -449,6 +449,7 @@ void App::DrawMiddleButtonsWindow(float h)
         if (ImGui::Button("Wyczyść drugi obraz", ImVec2(MIDDLE_BUTTON_W, MIDDLE_BUTTON_H)))
         {
             secondImage.ClearImage();
+            outputImage.ClearImage();
             resetDonePopupActive = true;
         }
     }
@@ -1333,36 +1334,19 @@ void App::DrawMaskingAndBlendParams()
     {
         ImGui::Text("Maskowanie obrazu");
         ImGui::Separator();
-        ImGui::TextWrapped("Jw(x,y) = J1(x,y) * Jmaska(x,y) / 255");
-        ImGui::Separator();
         ImGui::Text("Stan drugiego obrazu (maski):");
         if (secondImage.NoSurface())
             ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "Nie wczytano! Wczytaj przez:\nPlik -> Wczytaj drugi obraz");
-        else
-        {
-            ImGui::TextColored(ImVec4(0.3f, 1, 0.3f, 1), "Wczytano (%dx%d)",
-                secondImage.GetWidth(), secondImage.GetHeight());
-        }
     }
-    else // BlendImages
+    else
     {
         ImGui::Text("Mieszanie obrazów");
         ImGui::Separator();
-        ImGui::TextWrapped("Jwy = alpha * J1 + (1-alpha) * J2");
-        ImGui::Separator();
-        // suwak alpha
-        ImGui::SliderFloat("alpha", &params.blendAlpha, 0.0f, 1.0f);
-        ImGui::Text("alpha=1: tylko J1 (wejsciowy)");
-        ImGui::Text("alpha=0: tylko J2 (drugi obraz)");
-        ImGui::Separator();
-        ImGui::Text("Stan drugiego obrazu (J2):");
+        ImGui::SliderFloat("Alpha", &params.blendAlpha, 0.0f, 1.0f);
+        ImGui::Text("Alpha=1: tylko J1 (wejsciowy)");
+        ImGui::Text("Alpha=0: tylko J2 (drugi obraz)");
         if (secondImage.NoSurface())
             ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "Nie wczytano! Wczytaj przez:\nPlik -> Wczytaj drugi obraz\nlub uzyj 'Drugi obraz = Wyjscie'");
-        else
-        {
-            ImGui::TextColored(ImVec4(0.3f, 1, 0.3f, 1), "Wczytano (%dx%d)",
-                secondImage.GetWidth(), secondImage.GetHeight());
-        }
     }
 }
 
